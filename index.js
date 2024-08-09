@@ -1,4 +1,4 @@
-require('dotenv').config(); // Add this line if you're using dotenv for environment variables
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
@@ -79,13 +79,14 @@ app.get('/api/location', async (req, res) => {
   }
 });
 
+// New POST endpoint for adding a point
 app.post('/api/location', async (req, res) => {
   try {
-    const newPoint = {
-      i: req.body.i,
-      l: req.body.l,
-      e: req.body.e
-    };
+    const newPoint = req.body;
+
+    if (!newPoint || typeof newPoint !== 'object' || !newPoint.i || !Array.isArray(newPoint.l) || !newPoint.e) {
+      return res.status(400).json({ error: "Invalid data format. Expected a new point object with 'i', 'l', and 'e' properties." });
+    }
 
     const location = await Location.findOneAndUpdate(
       { t: "g" },
