@@ -21,11 +21,13 @@ const exitSchema = new mongoose.Schema({
 const pointSchema = new mongoose.Schema({
   i: String,
   l: [Number],
-  e: exitSchema
+  e: exitSchema,
+  caution: String
 });
 
 const locationSchema = new mongoose.Schema({
   t: String,
+  id: String,  // New field for the green tag ID
   c: [Number],
   r: Number,
   p: [pointSchema]
@@ -36,29 +38,33 @@ const Location = mongoose.model('Location', locationSchema);
 // Initialize data (can be fetched from DB or added initially)
 const data = new Location({
   t: "g",
+  id: "green1",  // Example green tag ID
   c: [-0.0994, 51.5808],
   r: 5,
   p: [
     new mongoose.model('Point', pointSchema)({
       i: "r1",
       l: [-0.1032, 51.5904],
-      e: new mongoose.model('Exit', exitSchema)({ n: "A", l: [-0.0906, 51.5898] })
+      e: new mongoose.model('Exit', exitSchema)({ n: "A", l: [-0.0906, 51.5898] }),
+      caution: "Caution: Heavy traffic during rush hours"
     }),
     new mongoose.model('Point', pointSchema)({
       i: "r2",
       l: [-0.0994, 51.5808],
-      e: new mongoose.model('Exit', exitSchema)({ n: "B", l: [-0.1024, 51.5686] })
+      e: new mongoose.model('Exit', exitSchema)({ n: "B", l: [-0.1024, 51.5686] }),
+      caution: "Caution: Construction work in progress"
     }),
     new mongoose.model('Point', pointSchema)({
       i: "r3",
       l: [-0.1101, 51.5863],
-      e: new mongoose.model('Exit', exitSchema)({ n: "C", l: [-0.1359, 51.5820] })
+      e: new mongoose.model('Exit', exitSchema)({ n: "C", l: [-0.1359, 51.5820] }),
+      caution: "Caution: Narrow lanes ahead"
     })
   ]
 });
 
 // Save the initial data to MongoDB only if it doesn't exist
-Location.findOne({ t: "g" }).then(existingLocation => {
+Location.findOne({ id: "green1" }).then(existingLocation => {
   if (!existingLocation) {
     data.save().then(() => console.log('Initial data saved')).catch(err => console.error('Error saving initial data:', err));
   } else {
@@ -66,10 +72,10 @@ Location.findOne({ t: "g" }).then(existingLocation => {
   }
 }).catch(err => console.error('Error checking for existing data:', err));
 
-// API endpoints
-app.get('/api/location', async (req, res) => {
+// Updated API endpoint to get location by green tag ID
+app.get('/api/location/:id', async (req, res) => {
   try {
-    const location = await Location.findOne({ t: "g" });
+    const location = await Location.findOne({ id: req.params.id });
     if (!location) {
       return res.status(404).json({ error: "Location not found" });
     }
@@ -79,17 +85,17 @@ app.get('/api/location', async (req, res) => {
   }
 });
 
-// New POST endpoint for adding a point
-app.post('/api/location', async (req, res) => {
+// Updated POST endpoint for adding a point
+app.post('/api/location/:id', async (req, res) => {
   try {
     const newPoint = req.body;
 
-    if (!newPoint || typeof newPoint !== 'object' || !newPoint.i || !Array.isArray(newPoint.l) || !newPoint.e) {
-      return res.status(400).json({ error: "Invalid data format. Expected a new point object with 'i', 'l', and 'e' properties." });
+    if (!newPoint || typeof newPoint !== 'object' || !newPoint.i || !Array.isArray(newPoint.l) || !newPoint.e || !newPoint.caution) {
+      return res.status(400).json({ error: "Invalid data format. Expected a new point object with 'i', 'l', 'e', and 'caution' properties." });
     }
 
     const location = await Location.findOneAndUpdate(
-      { t: "g" },
+      { id: req.params.id },
       { $push: { p: newPoint } },
       { new: true }
     );
