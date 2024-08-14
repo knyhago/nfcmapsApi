@@ -27,7 +27,7 @@ const pointSchema = new mongoose.Schema({
 
 const locationSchema = new mongoose.Schema({
   t: String,
-  id: String,  // New field for the green tag ID
+  id: String,
   c: [Number],
   r: Number,
   p: [pointSchema]
@@ -38,7 +38,7 @@ const Location = mongoose.model('Location', locationSchema);
 // Initialize data (can be fetched from DB or added initially)
 const data = new Location({
   t: "g",
-  id: "green1",  // Example green tag ID
+  id: "green1",
   c: [-0.0994, 51.5808],
   r: 5,
   p: [
@@ -72,7 +72,17 @@ Location.findOne({ id: "green1" }).then(existingLocation => {
   }
 }).catch(err => console.error('Error checking for existing data:', err));
 
-// Updated API endpoint to get location by green tag ID
+// API endpoint to get all green tag locations
+app.get('/api/locations', async (req, res) => {
+  try {
+    const locations = await Location.find({}, 'id c r'); // Only fetch id, center coordinates, and radius
+    res.json(locations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API endpoint to get location by green tag ID
 app.get('/api/location/:id', async (req, res) => {
   try {
     const location = await Location.findOne({ id: req.params.id });
@@ -85,7 +95,30 @@ app.get('/api/location/:id', async (req, res) => {
   }
 });
 
-// Updated POST endpoint for adding a point
+// POST endpoint for creating a new green tag location
+app.post('/api/location', async (req, res) => {
+  try {
+    const newLocation = req.body;
+
+    if (!newLocation || typeof newLocation !== 'object' || !newLocation.id || !Array.isArray(newLocation.c) || typeof newLocation.r !== 'number') {
+      return res.status(400).json({ error: "Invalid data format. Expected a new location object with 't', 'id', 'c', and 'r' properties." });
+    }
+
+    const existingLocation = await Location.findOne({ id: newLocation.id });
+    if (existingLocation) {
+      return res.status(409).json({ error: "A location with this ID already exists" });
+    }
+
+    const location = new Location(newLocation);
+    await location.save();
+
+    res.status(201).json(location);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST endpoint for adding a point to an existing location
 app.post('/api/location/:id', async (req, res) => {
   try {
     const newPoint = req.body;
